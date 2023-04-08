@@ -43,7 +43,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var issues []string
+	issues := make(map[string]int)
 	checkLabel(doc, &issues)
 	checkAltAttribute(doc, &issues)
 	checkButtonRole(doc, &issues)
@@ -69,14 +69,17 @@ func main() {
 	checkAnchorHref(doc, &issues)
 
 	fmt.Printf("Accessibility report for URL: %s\n", url)
+	totalIssues := 0
 	if len(issues) > 0 {
-		for _, issue := range issues {
-			fmt.Println("- " + issue)
+		for issue, count := range issues {
+			fmt.Printf("- %s (x%d)\n", issue, count)
+			totalIssues += count
 		}
-		fmt.Printf("Total issues: %d\n", len(issues))
 	} else {
 		fmt.Println("No accessibility issues found.")
 	}
+
+	fmt.Printf("Total issues: %d\n", totalIssues)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error counting lines: %v\n", err)
@@ -100,36 +103,36 @@ func countLines(reader io.Reader) (int, error) {
 	return count, nil
 }
 
-func checkArias(node *html.Node, issues *[]string) {
+func checkArias(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode {
 		switch node.Data {
 		case "img":
 			if hasAriaAttribute(node, "label") && !hasAltAttribute(node) {
-				*issues = append(*issues, "Image element with aria-label attribute but without an alt attribute.")
+				(*issues)["Image element with aria-label attribute but without an alt attribute."]++
 			}
 		case "button":
 			if hasAriaAttribute(node, "controls") && !hasAriaAttribute(node, "label") {
-				*issues = append(*issues, "Button element with aria-controls attribute but without an aria-label attribute.")
+				(*issues)["Button element with aria-controls attribute but without an aria-label attribute."]++
 			}
 		case "input":
 			if hasAriaAttribute(node, "placeholder") && !hasLabel(node) {
-				*issues = append(*issues, "Input element with aria-placeholder attribute but without a corresponding label element.")
+				(*issues)["Input element with aria-placeholder attribute but without a corresponding label element."]++
 			}
 		case "select":
 			if hasAriaAttribute(node, "label") && !hasLabel(node) {
-				*issues = append(*issues, "Select element with aria-label attribute but without a corresponding label element.")
+				(*issues)["Select element with aria-label attribute but without a corresponding label element."]++
 			}
 		case "textarea":
 			if hasAriaAttribute(node, "placeholder") && !hasLabel(node) {
-				*issues = append(*issues, "Textarea element with aria-placeholder attribute but without a corresponding label element.")
+				(*issues)["Textarea element with aria-placeholder attribute but without a corresponding label element."]++
 			}
 		case "table":
 			if hasAriaAttribute(node, "label") && !hasCaption(node) {
-				*issues = append(*issues, "Table element with aria-label attribute but without a corresponding caption element.")
+				(*issues)["Table element with aria-label attribute but without a corresponding caption element."]++
 			}
 		case "audio", "video":
 			if hasAriaAttribute(node, "description") && !hasAriaAttribute(node, "label") {
-				*issues = append(*issues, fmt.Sprintf("%s element with aria-description attribute but without an aria-label attribute.", node.Data))
+				(*issues)[fmt.Sprintf("%s element with aria-description attribute but without an aria-label attribute.", node.Data)]++
 			}
 		}
 	}
@@ -171,7 +174,7 @@ func hasAltAttribute(node *html.Node) bool {
 	return false
 }
 
-func checkFormSubmit(node *html.Node, issues *[]string) {
+func checkFormSubmit(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "form" {
 		var hasSubmit bool
 		for child := node.FirstChild; child != nil; child = child.NextSibling {
@@ -184,7 +187,7 @@ func checkFormSubmit(node *html.Node, issues *[]string) {
 			}
 		}
 		if !hasSubmit {
-			*issues = append(*issues, "Form element without a submit button.")
+			(*issues)["Form element without a submit button."]++
 		}
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
@@ -192,7 +195,7 @@ func checkFormSubmit(node *html.Node, issues *[]string) {
 	}
 }
 
-func checkFormMethod(node *html.Node, issues *[]string) {
+func checkFormMethod(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "form" {
 		var hasMethod bool
 		for _, attr := range node.Attr {
@@ -201,7 +204,7 @@ func checkFormMethod(node *html.Node, issues *[]string) {
 			}
 		}
 		if !hasMethod {
-			*issues = append(*issues, "Form element without a method attribute.")
+			(*issues)["Form element without a method attribute."]++
 		}
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
@@ -209,7 +212,7 @@ func checkFormMethod(node *html.Node, issues *[]string) {
 	}
 }
 
-func checkFormEnctype(node *html.Node, issues *[]string) {
+func checkFormEnctype(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "form" {
 		var hasEnctype bool
 		for _, attr := range node.Attr {
@@ -218,7 +221,7 @@ func checkFormEnctype(node *html.Node, issues *[]string) {
 			}
 		}
 		if !hasEnctype {
-			*issues = append(*issues, "Form element without an enctype attribute.")
+			(*issues)["Form element without an enctype attribute."]++
 		}
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
@@ -226,10 +229,10 @@ func checkFormEnctype(node *html.Node, issues *[]string) {
 	}
 }
 
-func checkFormValidity(node *html.Node, issues *[]string) {
+func checkFormValidity(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "form" {
 		if !hasFormValidation(node) {
-			*issues = append(*issues, "Form element without proper validation attributes.")
+			(*issues)["Form element without proper validation attributes."]++
 		}
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
@@ -249,117 +252,117 @@ func hasFormValidation(node *html.Node) bool {
 	return false
 }
 
-func checkInputType(node *html.Node, inputType string, issues *[]string) {
+func checkInputType(node *html.Node, inputType string, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "input" && hasInputType(node, inputType) && !hasLabel(node) {
-		*issues = append(*issues, fmt.Sprintf("Input element with type '%s' without a corresponding label element.", inputType))
+		(*issues)[fmt.Sprintf("Input element with type '%s' without a corresponding label element.", inputType)]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkInputType(child, inputType, issues)
 	}
 }
 
-func checkTableHeader(node *html.Node, issues *[]string) {
+func checkTableHeader(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "th" && !hasTableHeader(node.Parent) {
-		*issues = append(*issues, "Table header cell without a corresponding th or td parent element.")
+		(*issues)["Table header cell without a corresponding th or td parent element."]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkTableHeader(child, issues)
 	}
 }
 
-func checkTableScope(node *html.Node, scope string, issues *[]string) {
+func checkTableScope(node *html.Node, scope string, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "th" && !hasTableScope(node, scope) {
-		*issues = append(*issues, fmt.Sprintf("Table header cell without a '%s' scope attribute.", scope))
+		(*issues)[fmt.Sprintf("Table header cell without a '%s' scope attribute.", scope)]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkTableScope(child, scope, issues)
 	}
 }
 
-func checkList(node *html.Node, issues *[]string) {
+func checkList(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && (node.Data == "ul" || node.Data == "ol") && !hasListItem(node) {
-		*issues = append(*issues, fmt.Sprintf("%s element without any corresponding list item elements.", node.Data))
+		(*issues)[fmt.Sprintf("%s element without any corresponding list item elements.", node.Data)]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkList(child, issues)
 	}
 }
 
-func checkHeading(node *html.Node, issues *[]string) {
+func checkHeading(node *html.Node, issues *map[string]int) {
 	if hasHeading(node) && !hasTitle(node.Parent) {
-		*issues = append(*issues, "Heading element without a corresponding title element.")
+		(*issues)["Heading element without a corresponding title element."]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkHeading(child, issues)
 	}
 }
 
-func checkTitle(node *html.Node, issues *[]string) {
+func checkTitle(node *html.Node, issues *map[string]int) {
 	if hasTitle(node) && node.Parent != nil && (node.Parent.Type != html.ElementNode || node.Parent.Data != "head") {
-		*issues = append(*issues, "Title element not inside a head element.")
+		(*issues)["Title element not inside a head element."]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkTitle(child, issues)
 	}
 }
 
-func checkLabel(node *html.Node, issues *[]string) {
+func checkLabel(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && (node.Data == "input" || node.Data == "select" || node.Data == "textarea") && !hasLabel(node) {
-		*issues = append(*issues, fmt.Sprintf("%s element without a corresponding label element.", node.Data))
+		(*issues)[fmt.Sprintf("%s element without a corresponding label element.", node.Data)]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkLabel(child, issues)
 	}
 }
 
-func checkAltAttribute(node *html.Node, issues *[]string) {
+func checkAltAttribute(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "img" && !hasAltAttribute(node) {
-		*issues = append(*issues, "Image element without an alt attribute.")
+		(*issues)["Image element without an alt attribute."]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkAltAttribute(child, issues)
 	}
 }
 
-func checkButtonRole(node *html.Node, issues *[]string) {
+func checkButtonRole(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && hasButtonRole(node) && !hasLabel(node) {
-		*issues = append(*issues, "Button element without a corresponding label element.")
+		(*issues)["Button element without a corresponding label element."]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkButtonRole(child, issues)
 	}
 }
 
-func checkForm(node *html.Node, issues *[]string) {
+func checkForm(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "form" && !hasLabel(node) {
-		*issues = append(*issues, "Form element without any corresponding label elements.")
+		(*issues)["Form element without any corresponding label elements."]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkForm(child, issues)
 	}
 }
-func checkHiddenInput(node *html.Node, issues *[]string) {
+func checkHiddenInput(node *html.Node, issues *map[string]int) {
 	checkInputType(node, "hidden", issues)
 }
 
-func checkImageInput(node *html.Node, issues *[]string) {
+func checkImageInput(node *html.Node, issues *map[string]int) {
 	checkInputType(node, "image", issues)
 }
 
-func checkSubmitInput(node *html.Node, issues *[]string) {
+func checkSubmitInput(node *html.Node, issues *map[string]int) {
 	checkInputType(node, "submit", issues)
 }
-func checkImgAlt(node *html.Node, issues *[]string) {
+func checkImgAlt(node *html.Node, issues *map[string]int) {
 	if !hasAltAttribute(node) {
 		line := getLine(node)
-		*issues = append(*issues, fmt.Sprintf("Image element without an alt attribute. Line: %s", line))
+		(*issues)[fmt.Sprintf("Image element without an alt attribute. Line: %s", line)]++
 	}
 }
 
-func checkAnchorHref(node *html.Node, issues *[]string) {
+func checkAnchorHref(node *html.Node, issues *map[string]int) {
 	if !hasHrefAttribute(node) {
 		line := getLine(node)
-		*issues = append(*issues, fmt.Sprintf("Anchor element without an href attribute. Line: %s", line))
+		(*issues)[fmt.Sprintf("Anchor element without an href attribute. Line: %s", line)]++
 	}
 }
 func hasHrefAttribute(node *html.Node) bool {
@@ -492,40 +495,40 @@ func hasListItem(node *html.Node) bool {
 	return false
 }
 
-func checkFormLabel(node *html.Node, issues *[]string) {
+func checkFormLabel(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "form" && !hasLabel(node) {
-		*issues = append(*issues, "Form element without a corresponding label element.")
+		(*issues)["Form element without a corresponding label element."]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkFormLabel(child, issues)
 	}
 }
 
-func checkListItems(node *html.Node, issues *[]string) {
+func checkListItems(node *html.Node, issues *map[string]int) {
 	if node.Type == html.ElementNode && node.Data == "li" && !hasList(node.Parent) {
-		*issues = append(*issues, "List item element without a corresponding ol or ul parent element.")
+		(*issues)["List item element without a corresponding ol or ul parent element."]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkListItems(child, issues)
 	}
 }
 
-func checkListLabel(node *html.Node, issues *[]string) {
+func checkListLabel(node *html.Node, issues *map[string]int) {
 	if (node.Data == "ul" || node.Data == "ol") && !hasLabel(node) {
-		*issues = append(*issues, fmt.Sprintf("%s element without a corresponding label element.", node.Data))
+		(*issues)[fmt.Sprintf("%s element without a corresponding label element.", node.Data)]++
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		checkListLabel(child, issues)
 	}
 }
 
-func checkListIndentation(node *html.Node, depth int, issues *[]string) {
+func checkListIndentation(node *html.Node, depth int, issues *map[string]int) {
 	if node.Type == html.ElementNode && (node.Data == "ul" || node.Data == "ol") {
 		for child := node.FirstChild; child != nil; child = child.NextSibling {
 			if child.Type == html.ElementNode && child.Data == "li" {
 				for i := 0; i < depth; i++ {
 					if child.PrevSibling == nil || child.PrevSibling.Data != "li" {
-						*issues = append(*issues, fmt.Sprintf("%s element with inconsistent indentation.", node.Data))
+						(*issues)[fmt.Sprintf("%s element with inconsistent indentation.", node.Data)]++
 						break
 					}
 				}
