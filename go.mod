@@ -1,4 +1,4 @@
-module github.comdonuts-are-good/audit-ally
+module github.comdonuts-are-good/audit-a11y
 
 go 1.20
 
