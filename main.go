@@ -19,6 +19,13 @@ func main() {
 	}
 	url := os.Args[1]
 	resp, err := http.Get(url)
+
+	// Add https:// if the URL doesn't have any protocol scheme specified.
+	if err != nil && strings.Contains(err.Error(), "unsupported protocol scheme") {
+		url = "https://" + url
+		resp, err = http.Get(url)
+	}
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error fetching URL %s: %v\n", url, err)
 		os.Exit(1)
